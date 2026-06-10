@@ -276,7 +276,7 @@ async function animate() {
         document.getElementById('gpuDot').className = 'gd ' + (s === 'ready' || s === 'busy' ? s : '');
         var t = document.getElementById('gpuTxt');
         t.className = 'gt ' + (s === 'ready' || s === 'busy' ? s : '');
-        t.textContent = s === 'ready' ? 'RTX 5080 Ready' : s === 'busy' ? 'GPU Busy' : 'GPU Offline';
+        t.textContent = s === 'ready' ? 'GPU Online' : s === 'busy' ? 'GPU Busy' : 'GPU Offline';
         if (s !== 'ready') document.getElementById('offlineNote').classList.add('show');
         else document.getElementById('offlineNote').classList.remove('show');
       }).catch(function(){
