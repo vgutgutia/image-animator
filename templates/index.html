@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <link rel="icon" type="image/png" href="/static/logo.png" />
+  <title>Image Animator - SPB Data Science Club</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{--bg:#090909;--surface:#141414;--surface-2:#1a1a1a;--border:#222;--border-l:#2e2e2e;--text:#ebebeb;--dim:#aaa;--muted:#666;--accent:#8b0044;--accent2:#660033;--pink:#c4006a;--radius:10px}
+    body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased;line-height:1.6}
+
+    .shell{display:grid;grid-template-columns:300px 1fr;min-height:100vh}
+    .sidebar{background:#0d0d0d;border-right:1px solid var(--border);padding:1.75rem 1.4rem;display:flex;flex-direction:column;gap:1.25rem;position:sticky;top:0;height:100vh;overflow-y:auto}
+    .main{padding:2.25rem 2.5rem;max-width:980px}
+
+    .logo{display:flex;align-items:center;gap:.75rem}
+    .logo-name{font-size:.95rem;font-weight:700;line-height:1.25}
+
+    .section-label{font-size:.65rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:.5rem}
+
+    .gpu-status-pill{display:inline-flex;align-items:center;gap:.45rem;padding:.28rem .7rem;border-radius:999px;border:1px solid #2a2a2a;background:#181818;font-size:.72rem;font-weight:600;letter-spacing:.03em;cursor:default;white-space:nowrap;width:fit-content}
+    .gpu-status-pill .gd{width:7px;height:7px;border-radius:50%;flex-shrink:0;background:#444}
+    .gpu-status-pill .gd.ready{background:#4ade80;box-shadow:0 0 5px #4ade8077;animation:gpuGlow 2s ease-in-out infinite}
+    .gpu-status-pill .gd.busy{background:#fbbf24;box-shadow:0 0 5px #fbbf2477;animation:gpuGlow 1s ease-in-out infinite}
+    .gpu-status-pill .gt{color:#555}
+    .gpu-status-pill .gt.ready{color:#4ade80}
+    .gpu-status-pill .gt.busy{color:#fbbf24}
+    @keyframes gpuGlow{0%,100%{opacity:1}50%{opacity:.35}}
+
+    .motion-list{display:flex;flex-direction:column;gap:.4rem}
+    .motion-opt{padding:.65rem .8rem;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);cursor:pointer;transition:all .15s}
+    .motion-opt:hover{border-color:#3a3a3a}
+    .motion-opt.selected{border-color:rgba(139,0,68,.55);background:rgba(102,0,51,.16)}
+    .motion-name{font-size:.84rem;font-weight:600}
+    .motion-desc{font-size:.7rem;color:var(--muted);line-height:1.5;margin-top:.1rem}
+
+    .gen-btn{width:100%;padding:.7rem;background:var(--accent2);color:#fff;border:none;border-radius:8px;font-size:.92rem;font-weight:600;font-family:inherit;cursor:pointer;transition:background .2s}
+    .gen-btn:hover:not(:disabled){background:var(--accent)}
+    .gen-btn:disabled{opacity:.5;cursor:default}
+
+    .ethics-card{background:rgba(102,0,51,.08);border:1px solid rgba(139,0,68,.3);border-radius:8px;padding:.85rem 1rem;font-size:.74rem;color:var(--dim);line-height:1.6}
+    .ethics-card strong{color:var(--text)}
+
+    .main-title{font-size:1.75rem;font-weight:800;letter-spacing:-.028em;margin-bottom:.3rem}
+    .main-sub{font-size:.92rem;color:var(--dim);margin-bottom:1.75rem}
+
+    .work-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.5rem}
+    .panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column;min-height:340px}
+    .panel-head{padding:.8rem 1.2rem;border-bottom:1px solid var(--border);font-size:.65rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+    .panel-body{flex:1;display:flex;align-items:center;justify-content:center;padding:1.25rem;position:relative}
+
+    .drop-zone{border:1.5px dashed var(--border-l);border-radius:8px;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.6rem;cursor:pointer;transition:border-color .2s;color:var(--muted);text-align:center;padding:1.5rem}
+    .drop-zone:hover,.drop-zone.over{border-color:var(--accent)}
+    .drop-zone svg{opacity:.35}
+    .drop-hint{font-size:.82rem}
+    .drop-sub{font-size:.68rem;color:#555}
+
+    #previewImg{max-width:100%;max-height:280px;border-radius:8px;display:block}
+    #resultVideo{max-width:100%;max-height:280px;border-radius:8px;display:block}
+    .result-empty{color:var(--muted);font-size:.86rem;text-align:center;line-height:1.7;padding:0 1.5rem}
+
+    .offline-note{background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.22);border-radius:8px;padding:1rem 1.25rem;margin-bottom:1.5rem;display:none}
+    .offline-note.show{display:block}
+    .offline-title{font-size:.8rem;font-weight:700;color:#f87171;margin-bottom:.2rem}
+    .offline-sub{font-size:.78rem;color:var(--dim);line-height:1.6}
+
+    .guidelines{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem 1.5rem}
+    .guidelines-title{font-size:.65rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:.7rem}
+    .guidelines ul{padding-left:1.1rem}
+    .guidelines li{font-size:.82rem;color:var(--dim);line-height:1.7;margin-bottom:.35rem}
+    .guidelines strong{color:var(--text)}
+
+    /* Ethics modal */
+    .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.82);display:flex;align-items:center;justify-content:center;z-index:100;padding:1.5rem}
+    .modal{background:var(--surface);border:1px solid var(--border-l);border-radius:14px;max-width:560px;width:100%;padding:2rem 2.25rem}
+    .modal h2{font-size:1.25rem;font-weight:800;letter-spacing:-.02em;margin-bottom:.85rem}
+    .modal p{font-size:.88rem;color:var(--dim);line-height:1.7;margin-bottom:.75rem}
+    .modal ul{padding-left:1.2rem;margin-bottom:1.1rem}
+    .modal li{font-size:.84rem;color:var(--dim);line-height:1.7;margin-bottom:.3rem}
+    .modal strong{color:var(--text)}
+    .modal-check{display:flex;align-items:flex-start;gap:.6rem;margin-bottom:1.1rem;cursor:pointer}
+    .modal-check input{margin-top:.3rem;accent-color:var(--accent);cursor:pointer}
+    .modal-check span{font-size:.84rem;color:var(--text);line-height:1.6}
+    .modal-btn{width:100%;padding:.75rem;background:var(--accent2);color:#fff;border:none;border-radius:8px;font-size:.92rem;font-weight:600;font-family:inherit;cursor:pointer;transition:background .2s}
+    .modal-btn:hover:not(:disabled){background:var(--accent)}
+    .modal-btn:disabled{opacity:.4;cursor:default}
+
+    .spinner{display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:.45rem}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .hidden{display:none!important}
+
+    @media(max-width:900px){.shell{grid-template-columns:1fr}.sidebar{position:static;height:auto;border-right:none;border-bottom:1px solid var(--border)}.work-grid{grid-template-columns:1fr}.main{padding:1.5rem}}
+  </style>
+</head>
+<body>
+
+<!-- Ethics gate: must be acknowledged before the tool is usable -->
+<div class="modal-backdrop" id="ethicsModal">
+  <div class="modal">
+    <h2>Before You Animate</h2>
+    <p>This tool uses a motion synthesis model to make still images move. The same technology family powers deepfakes, so we ask every user to agree to ground rules first.</p>
+    <ul>
+      <li><strong>No real people without consent.</strong> Do not animate photos of classmates, teachers, public figures, or anyone who has not agreed.</li>
+      <li><strong>No deception.</strong> Anything you create here is for learning how the technology works, not for passing off as real footage.</li>
+      <li><strong>Output is watermarked</strong> as AI-generated and we keep job logs.</li>
+    </ul>
+    <p>Animals, drawings, statues, and your own face are all fair game. Make a squirrel talk.</p>
+    <label class="modal-check">
+      <input type="checkbox" id="ethicsCheck" onchange="document.getElementById('ethicsAgree').disabled=!this.checked"/>
+      <span>I understand and agree to use this tool responsibly and for educational purposes only.</span>
+    </label>
+    <button class="modal-btn" id="ethicsAgree" disabled onclick="acceptEthics()">Continue</button>
+  </div>
+</div>
+
+<div class="shell">
+  <aside class="sidebar">
+    <div class="logo">
+      <img src="/static/logo.png" alt="Image Animator" style="width:44px;height:44px;border-radius:9px;object-fit:contain;display:block;flex-shrink:0"/>
+      <div class="logo-name">Image Animator</div>
+    </div>
+
+    <div class="gpu-status-pill" id="gpuPill"><div class="gd" id="gpuDot"></div><span class="gt" id="gpuTxt">GPU...</span></div>
+
+    <div>
+      <div class="section-label">Motion Preset</div>
+      <div class="motion-list">
+        {% for m in motions %}
+        <div class="motion-opt {% if loop.first %}selected{% endif %}" data-id="{{ m.id }}" onclick="selectMotion(this)">
+          <div class="motion-name">{{ m.name }}</div>
+          <div class="motion-desc">{{ m.desc }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <button class="gen-btn" id="animateBtn" onclick="animate()" disabled>Animate</button>
+
+    <div class="ethics-card">
+      <strong>Educational use only.</strong> This project exists to teach how motion synthesis works and how to recognize synthetic video. Misuse is a violation of club policy.
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="main-title">Image Animator</div>
+    <div class="main-sub">First-order motion synthesis: give a still image a short life on the club's RTX 5080</div>
+
+    <div class="offline-note" id="offlineNote">
+      <div class="offline-title">GPU Required - Currently Offline</div>
+      <div class="offline-sub">Motion synthesis needs the club's RTX 5080 compute server, which is busy or offline right now. You can still upload an image and pick a preset; generation will work once the GPU is back. The status pill on the left updates automatically.</div>
+    </div>
+
+    <div class="work-grid">
+      <div class="panel">
+        <div class="panel-head">Source Image</div>
+        <div class="panel-body">
+          <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            <div class="drop-hint">Drop an image here or click to browse</div>
+            <div class="drop-sub">JPG or PNG, up to 12 MB. Portraits, pets, drawings, statues.</div>
+          </div>
+          <img id="previewImg" class="hidden" alt="preview"/>
+          <input type="file" id="fileInput" accept="image/jpeg,image/png" style="display:none" onchange="onFile(this.files[0])"/>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">Result</div>
+        <div class="panel-body">
+          <div class="result-empty" id="resultEmpty">The generated clip appears here. Typical render time is 20 to 60 seconds on the RTX 5080.</div>
+          <video id="resultVideo" class="hidden" controls loop autoplay muted></video>
+        </div>
+      </div>
+    </div>
+
+    <div class="guidelines">
+      <div class="guidelines-title">How It Works and Why We Teach It</div>
+      <ul>
+        <li><strong>The model.</strong> A first-order motion model learns keypoints and local transformations from a driving video, then warps your still image to follow the same motion, frame by frame.</li>
+        <li><strong>Why students should build one.</strong> Synthetic media is not going away. Understanding the pipeline from the inside is the most reliable way to learn its tells: warped backgrounds, inconsistent lighting, texture shimmer.</li>
+        <li><strong>Spotting fakes.</strong> Look at ears, teeth, and hair during fast motion. Keypoint models struggle with occlusion and fine texture, and that is exactly where artifacts hide.</li>
+        <li><strong>Our safeguards.</strong> Consent rule for real people, visible watermark on output, server-side job logging, and this guideline page on every visit.</li>
+      </ul>
+    </div>
+  </main>
+</div>
+
+<script>
+'use strict';
+
+let currentFile = null;
+let selectedMotion = '{{ motions[0].id }}';
+
+// Ethics gate
+if (localStorage.getItem('spb_animator_ethics') === 'agreed') {
+  document.getElementById('ethicsModal').style.display = 'none';
+}
+function acceptEthics() {
+  localStorage.setItem('spb_animator_ethics', 'agreed');
+  document.getElementById('ethicsModal').style.display = 'none';
+}
+
+function selectMotion(el) {
+  document.querySelectorAll('.motion-opt').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedMotion = el.dataset.id;
+}
+
+// Upload handling
+const dropZone = document.getElementById('dropZone');
+['dragover', 'dragenter'].forEach(ev => dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.add('over'); }));
+['dragleave', 'drop'].forEach(ev => dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.remove('over'); }));
+dropZone.addEventListener('drop', e => { if (e.dataTransfer.files[0]) onFile(e.dataTransfer.files[0]); });
+
+function onFile(file) {
+  if (!file || !/^image\/(jpeg|png)$/.test(file.type)) { alert('Please choose a JPG or PNG image.'); return; }
+  if (file.size > 12 * 1024 * 1024) { alert('Image is larger than 12 MB.'); return; }
+  currentFile = file;
+  const reader = new FileReader();
+  reader.onload = e => {
+    dropZone.classList.add('hidden');
+    const img = document.getElementById('previewImg');
+    img.src = e.target.result;
+    img.classList.remove('hidden');
+  };
+  reader.readAsDataURL(file);
+  updateBtn();
+}
+
+function updateBtn() {
+  document.getElementById('animateBtn').disabled = !currentFile;
+}
+
+async function animate() {
+  if (!currentFile) return;
+  const btn = document.getElementById('animateBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Rendering...';
+
+  const form = new FormData();
+  form.append('image', currentFile);
+  form.append('motion', selectedMotion);
+
+  try {
+    const res = await fetch('/api/animate', {method: 'POST', body: form});
+    if (res.headers.get('Content-Type') && res.headers.get('Content-Type').startsWith('video/')) {
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      document.getElementById('resultEmpty').classList.add('hidden');
+      const vid = document.getElementById('resultVideo');
+      vid.src = url;
+      vid.classList.remove('hidden');
+      document.getElementById('offlineNote').classList.remove('show');
+    } else {
+      const data = await res.json();
+      if (data.gpu_offline) document.getElementById('offlineNote').classList.add('show');
+      else alert(data.error || 'Animation failed.');
+    }
+  } catch (e) {
+    alert('Request failed. Try again.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Animate';
+    updateBtn();
+  }
+}
+
+// GPU status pill (shared club endpoint)
+(function(){
+  function upd(){
+    fetch('https://spbdatascience.org/api/gpu-status')
+      .then(function(r){return r.json();})
+      .then(function(d){
+        var s = d.status || 'offline';
+        document.getElementById('gpuDot').className = 'gd ' + (s === 'ready' || s === 'busy' ? s : '');
+        var t = document.getElementById('gpuTxt');
+        t.className = 'gt ' + (s === 'ready' || s === 'busy' ? s : '');
+        t.textContent = s === 'ready' ? 'RTX 5080 Ready' : s === 'busy' ? 'GPU Busy' : 'GPU Offline';
+        if (s !== 'ready') document.getElementById('offlineNote').classList.add('show');
+        else document.getElementById('offlineNote').classList.remove('show');
+      }).catch(function(){
+        document.getElementById('gpuTxt').textContent = 'GPU Offline';
+        document.getElementById('offlineNote').classList.add('show');
+      });
+  }
+  upd(); setInterval(upd, 20000);
+})();
+</script>
+</body>
+</html>
