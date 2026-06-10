@@ -42,6 +42,7 @@ def status():
 
 @app.route("/api/animate", methods=["POST"])
 def animate():
+    """Submit a render job to the GPU queue; returns a job id to poll."""
     if "image" not in request.files:
         return jsonify({"error": "No image provided"}), 400
     prompt = (request.form.get("prompt") or "").strip()
@@ -51,21 +52,38 @@ def animate():
         return jsonify({"error": "Prompt too long (max 400 characters)."}), 400
 
     file = request.files["image"]
-    raw  = file.read()
     try:
         resp = http.post(
-            f"{NECRON}/animate",
-            files={"image": (file.filename, raw, file.content_type)},
+            f"{NECRON}/jobs/animate",
+            files={"image": (file.filename, file.read(), file.content_type)},
             data={"prompt": prompt},
-            timeout=(CONNECT_TIMEOUT, READ_TIMEOUT),
+            timeout=(CONNECT_TIMEOUT, 30),
         )
-        return (resp.content, resp.status_code,
-                {"Content-Type": resp.headers.get("Content-Type", "application/json")})
+        return (resp.content, resp.status_code, {"Content-Type": "application/json"})
     except http.exceptions.RequestException:
         return jsonify({
             "error": "The club's GPU servers are offline right now. Try again later.",
             "gpu_offline": True,
         }), 503
+
+
+@app.route("/api/job/<jid>")
+def job_status(jid):
+    try:
+        resp = http.get(f"{NECRON}/jobs/{jid}", timeout=(CONNECT_TIMEOUT, 15))
+        return (resp.content, resp.status_code, {"Content-Type": "application/json"})
+    except http.exceptions.RequestException:
+        return jsonify({"error": "GPU server unreachable", "gpu_offline": True}), 503
+
+
+@app.route("/api/job/<jid>/result")
+def job_result(jid):
+    try:
+        resp = http.get(f"{NECRON}/jobs/{jid}/result", timeout=(CONNECT_TIMEOUT, 60))
+        return (resp.content, resp.status_code,
+                {"Content-Type": resp.headers.get("Content-Type", "application/octet-stream")})
+    except http.exceptions.RequestException:
+        return jsonify({"error": "GPU server unreachable"}), 503
 
 
 if __name__ == "__main__":

@@ -261,36 +261,71 @@ async function animate() {
   if (!currentFile || !prompt) return;
   const btn = document.getElementById('animateBtn');
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span>Rendering on GPU...';
+  btn.innerHTML = '<span class="spinner"></span>Submitting...';
 
   const form = new FormData();
   form.append('image', currentFile);
   form.append('prompt', prompt);
 
   try {
-    const res = await fetch('/api/animate', {method: 'POST', body: form});
-    const ctype = res.headers.get('Content-Type') || '';
-    if (res.ok && ctype.startsWith('video/')) {
-      const blob = await res.blob();
-      const url  = URL.createObjectURL(blob);
-      document.getElementById('resultEmpty').classList.add('hidden');
-      document.getElementById('resultWrap').classList.remove('hidden');
-      const vid = document.getElementById('resultVideo');
-      vid.src = url;
-      document.getElementById('downloadBtn').href = url;
-      document.getElementById('offlineNote').classList.remove('show');
-    } else {
-      const data = await res.json();
-      if (data.gpu_offline) document.getElementById('offlineNote').classList.add('show');
-      else alert(data.error || 'Animation failed.');
-    }
+    const res  = await fetch('/api/animate', {method: 'POST', body: form});
+    const data = await res.json();
+    if (data.gpu_offline) { document.getElementById('offlineNote').classList.add('show'); resetBtn(); return; }
+    if (data.error) { alert(data.error); resetBtn(); return; }
+    pollJob(data.job_id, data.position);
   } catch (e) {
-    alert('Request failed or timed out. Try a shorter prompt or try again.');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Animate';
-    updateBtn();
+    alert('Could not reach the server. Try again.');
+    resetBtn();
   }
+}
+
+function resetBtn() {
+  const btn = document.getElementById('animateBtn');
+  btn.disabled = false;
+  btn.textContent = 'Animate';
+  updateBtn();
+}
+
+async function pollJob(jobId, startPos) {
+  const btn = document.getElementById('animateBtn');
+  const t0  = Date.now();
+  const timer = setInterval(async () => {
+    if (Date.now() - t0 > 12 * 60 * 1000) {  // 12 min safety stop
+      clearInterval(timer);
+      alert('Render is taking unusually long. Check back shortly or try again.');
+      resetBtn();
+      return;
+    }
+    try {
+      const res  = await fetch('/api/job/' + jobId);
+      const data = await res.json();
+      if (data.status === 'queued') {
+        btn.innerHTML = '<span class="spinner"></span>In queue' + (data.position > 0 ? ' - #' + data.position : '') + '...';
+      } else if (data.status === 'running') {
+        btn.innerHTML = '<span class="spinner"></span>Rendering on GPU...';
+      } else if (data.status === 'done') {
+        clearInterval(timer);
+        const r    = await fetch('/api/job/' + jobId + '/result');
+        const blob = await r.blob();
+        const url  = URL.createObjectURL(blob);
+        document.getElementById('resultEmpty').classList.add('hidden');
+        document.getElementById('resultWrap').classList.remove('hidden');
+        const vid = document.getElementById('resultVideo');
+        vid.src = url;
+        document.getElementById('downloadBtn').href = url;
+        document.getElementById('offlineNote').classList.remove('show');
+        resetBtn();
+      } else if (data.status === 'error') {
+        clearInterval(timer);
+        alert('Render failed: ' + (data.error || 'unknown error') + '. Try a different image or prompt.');
+        resetBtn();
+      } else if (data.gpu_offline) {
+        clearInterval(timer);
+        document.getElementById('offlineNote').classList.add('show');
+        resetBtn();
+      }
+    } catch (e) { /* transient poll failure, keep trying */ }
+  }, 2500);
 }
 
 // GPU status pill (shared club endpoint)
