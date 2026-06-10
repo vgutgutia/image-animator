@@ -28,6 +28,16 @@
     .gpu-status-pill .gt.busy{color:#fbbf24}
     @keyframes gpuGlow{0%,100%{opacity:1}50%{opacity:.35}}
 
+    .prompt-input{width:100%;background:var(--surface-2);border:1px solid var(--border-l);border-radius:8px;padding:.7rem .8rem;font-size:.85rem;font-family:inherit;color:var(--text);resize:vertical;outline:none;line-height:1.6;transition:border-color .15s}
+    .prompt-input:focus{border-color:var(--accent)}
+    .prompt-input::placeholder{color:var(--muted);font-size:.78rem}
+    .idea-list{display:flex;flex-direction:column;gap:.3rem}
+    .idea-chip{font-size:.73rem;color:var(--dim);padding:.45rem .65rem;background:var(--surface-2);border:1px solid var(--border);border-radius:6px;cursor:pointer;transition:all .15s;line-height:1.45}
+    .idea-chip:hover{color:var(--text);border-color:rgba(139,0,68,.4)}
+    .remove-img{position:absolute;top:.6rem;right:.6rem;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,.65);border:1px solid #3a3a3a;color:#ccc;font-size:1rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;z-index:2}
+    .remove-img:hover{background:rgba(139,0,68,.8);border-color:var(--accent)}
+    .dl-btn{display:inline-flex;align-items:center;gap:.4rem;margin-top:.7rem;padding:.45rem .9rem;background:var(--surface-2);border:1px solid var(--border-l);border-radius:7px;color:var(--dim);font-size:.78rem;font-weight:600;cursor:pointer;text-decoration:none;transition:all .15s}
+    .dl-btn:hover{color:var(--text);border-color:#3a3a3a}
     .motion-list{display:flex;flex-direction:column;gap:.4rem}
     .motion-opt{padding:.65rem .8rem;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);cursor:pointer;transition:all .15s}
     .motion-opt:hover{border-color:#3a3a3a}
@@ -103,7 +113,7 @@
     <ul>
       <li><strong>No real people without consent.</strong> Do not animate photos of classmates, teachers, public figures, or anyone who has not agreed.</li>
       <li><strong>No deception.</strong> Anything you create here is for learning how the technology works, not for passing off as real footage.</li>
-      <li><strong>Output is watermarked</strong> as AI-generated and we keep job logs.</li>
+      <li><strong>Label what you share.</strong> If you post a clip somewhere, say it is AI-generated.</li>
     </ul>
     <p>Animals, drawings, statues, and your own face are all fair game. Make a squirrel talk.</p>
     <label class="modal-check">
@@ -124,13 +134,14 @@
     <div class="gpu-status-pill" id="gpuPill"><div class="gd" id="gpuDot"></div><span class="gt" id="gpuTxt">GPU...</span></div>
 
     <div>
-      <div class="section-label">Motion Preset</div>
-      <div class="motion-list">
-        {% for m in motions %}
-        <div class="motion-opt {% if loop.first %}selected{% endif %}" data-id="{{ m.id }}" onclick="selectMotion(this)">
-          <div class="motion-name">{{ m.name }}</div>
-          <div class="motion-desc">{{ m.desc }}</div>
-        </div>
+      <div class="section-label">Describe the Motion</div>
+      <textarea id="promptInput" class="prompt-input" rows="4" maxlength="400"
+                placeholder="Write what should happen in the video, e.g. 'the squirrel chatters and flicks its tail while leaves fall around it'"
+                oninput="updateBtn()"></textarea>
+      <div class="section-label" style="margin-top:.8rem">Ideas</div>
+      <div class="idea-list">
+        {% for idea in ideas %}
+        <div class="idea-chip" onclick="useIdea(this)">{{ idea }}</div>
         {% endfor %}
       </div>
     </div>
@@ -144,11 +155,11 @@
 
   <main class="main">
     <div class="main-title">Image Animator</div>
-    <div class="main-sub">First-order motion synthesis: give a still image a short life on the club's RTX 5080</div>
+    <div class="main-sub">Upload an image, type what should happen, and a video diffusion model renders it live on the club's GPUs</div>
 
     <div class="offline-note" id="offlineNote">
       <div class="offline-title">GPU Required - Currently Offline</div>
-      <div class="offline-sub">Motion synthesis needs the club's RTX 5080 compute server, which is busy or offline right now. You can still upload an image and pick a preset; generation will work once the GPU is back. The status pill on the left updates automatically.</div>
+      <div class="offline-sub">Motion synthesis needs the club's GPU servers, which is busy or offline right now. You can still upload an image and pick a preset; generation will work once the GPU is back. The status pill on the left updates automatically.</div>
     </div>
 
     <div class="work-grid">
@@ -161,6 +172,7 @@
             <div class="drop-sub">JPG or PNG, up to 12 MB. Portraits, pets, drawings, statues.</div>
           </div>
           <img id="previewImg" class="hidden" alt="preview"/>
+          <button class="remove-img hidden" id="removeImgBtn" onclick="removeImage()" title="Remove image">&#215;</button>
           <input type="file" id="fileInput" accept="image/jpeg,image/png" style="display:none" onchange="onFile(this.files[0])"/>
         </div>
       </div>
@@ -168,8 +180,11 @@
       <div class="panel">
         <div class="panel-head">Result</div>
         <div class="panel-body">
-          <div class="result-empty" id="resultEmpty">The generated clip appears here. Typical render time is 20 to 60 seconds on the RTX 5080.</div>
-          <video id="resultVideo" class="hidden" controls loop autoplay muted></video>
+          <div class="result-empty" id="resultEmpty">The generated clip appears here. Typical render time is 30 to 90 seconds on the club's GPUs.</div>
+          <div id="resultWrap" class="hidden" style="text-align:center">
+            <video id="resultVideo" controls loop autoplay muted></video>
+            <a class="dl-btn" id="downloadBtn" download="animation.mp4">Download clip</a>
+          </div>
         </div>
       </div>
     </div>
@@ -177,10 +192,10 @@
     <div class="guidelines">
       <div class="guidelines-title">How It Works and Why We Teach It</div>
       <ul>
-        <li><strong>The model.</strong> A first-order motion model learns keypoints and local transformations from a driving video, then warps your still image to follow the same motion, frame by frame.</li>
+        <li><strong>The model.</strong> LTX-Video, a latent diffusion transformer: it encodes your image, then denoises a whole block of video frames at once, guided by your text prompt.</li>
         <li><strong>Why students should build one.</strong> Synthetic media is not going away. Understanding the pipeline from the inside is the most reliable way to learn its tells: warped backgrounds, inconsistent lighting, texture shimmer.</li>
         <li><strong>Spotting fakes.</strong> Look at ears, teeth, and hair during fast motion. Keypoint models struggle with occlusion and fine texture, and that is exactly where artifacts hide.</li>
-        <li><strong>Our safeguards.</strong> Consent rule for real people, visible watermark on output, server-side job logging, and this guideline page on every visit.</li>
+        <li><strong>Our ground rules.</strong> Consent required for real people, no deceptive use, and this guideline stays on every visit.</li>
       </ul>
     </div>
   </main>
@@ -190,7 +205,6 @@
 'use strict';
 
 let currentFile = null;
-let selectedMotion = '{{ motions[0].id }}';
 
 // Ethics gate
 if (localStorage.getItem('spb_animator_ethics') === 'agreed') {
@@ -201,10 +215,9 @@ function acceptEthics() {
   document.getElementById('ethicsModal').style.display = 'none';
 }
 
-function selectMotion(el) {
-  document.querySelectorAll('.motion-opt').forEach(o => o.classList.remove('selected'));
-  el.classList.add('selected');
-  selectedMotion = el.dataset.id;
+function useIdea(el) {
+  document.getElementById('promptInput').value = el.textContent.trim();
+  updateBtn();
 }
 
 // Upload handling
@@ -223,34 +236,48 @@ function onFile(file) {
     const img = document.getElementById('previewImg');
     img.src = e.target.result;
     img.classList.remove('hidden');
+    document.getElementById('removeImgBtn').classList.remove('hidden');
   };
   reader.readAsDataURL(file);
   updateBtn();
 }
 
+function removeImage() {
+  currentFile = null;
+  document.getElementById('fileInput').value = '';
+  document.getElementById('previewImg').classList.add('hidden');
+  document.getElementById('removeImgBtn').classList.add('hidden');
+  dropZone.classList.remove('hidden');
+  updateBtn();
+}
+
 function updateBtn() {
-  document.getElementById('animateBtn').disabled = !currentFile;
+  const prompt = document.getElementById('promptInput').value.trim();
+  document.getElementById('animateBtn').disabled = !(currentFile && prompt.length >= 8);
 }
 
 async function animate() {
-  if (!currentFile) return;
+  const prompt = document.getElementById('promptInput').value.trim();
+  if (!currentFile || !prompt) return;
   const btn = document.getElementById('animateBtn');
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span>Rendering...';
+  btn.innerHTML = '<span class="spinner"></span>Rendering on GPU...';
 
   const form = new FormData();
   form.append('image', currentFile);
-  form.append('motion', selectedMotion);
+  form.append('prompt', prompt);
 
   try {
     const res = await fetch('/api/animate', {method: 'POST', body: form});
-    if (res.headers.get('Content-Type') && res.headers.get('Content-Type').startsWith('video/')) {
+    const ctype = res.headers.get('Content-Type') || '';
+    if (res.ok && ctype.startsWith('video/')) {
       const blob = await res.blob();
       const url  = URL.createObjectURL(blob);
       document.getElementById('resultEmpty').classList.add('hidden');
+      document.getElementById('resultWrap').classList.remove('hidden');
       const vid = document.getElementById('resultVideo');
       vid.src = url;
-      vid.classList.remove('hidden');
+      document.getElementById('downloadBtn').href = url;
       document.getElementById('offlineNote').classList.remove('show');
     } else {
       const data = await res.json();
@@ -258,7 +285,7 @@ async function animate() {
       else alert(data.error || 'Animation failed.');
     }
   } catch (e) {
-    alert('Request failed. Try again.');
+    alert('Request failed or timed out. Try a shorter prompt or try again.');
   } finally {
     btn.disabled = false;
     btn.textContent = 'Animate';

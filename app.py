@@ -1,9 +1,9 @@
 """
 Image Animator (educational)
-Brings a still image to life with a chosen motion preset using a
-first-order motion model running on the club's RTX 5080 worker.
-Built to teach how image-to-video synthesis works and why media
-literacy matters; the ethics gate in the UI is mandatory.
+Brings a still image to life from a text prompt using the LTX-Video
+image-to-video diffusion model running on the club's GPU servers.
+Built to teach how video synthesis works and why media literacy
+matters; the ethics gate in the UI is mandatory.
 """
 from flask import Flask, render_template, request, jsonify
 import requests as http
@@ -13,24 +13,26 @@ app.config["MAX_CONTENT_LENGTH"] = 12 * 1024 * 1024
 
 NECRON          = "http://100.72.210.90:15100"
 CONNECT_TIMEOUT = 4
-READ_TIMEOUT    = 300
+READ_TIMEOUT    = 420
 
-MOTIONS = [
-    {"id": "talk",  "name": "Talking",     "desc": "Drives the face with a short speech clip. Works best on front-facing portraits."},
-    {"id": "nod",   "name": "Nod and Look","desc": "Subtle head motion: a nod, a glance left and right."},
-    {"id": "smile", "name": "Smile",       "desc": "Animates a neutral expression into a smile and back."},
-    {"id": "pan",   "name": "Cinematic Pan","desc": "Classic documentary zoom and pan. Works on any image, not just faces."},
+PROMPT_IDEAS = [
+    "The squirrel turns its head and chatters, tail flicking",
+    "Gentle wind moves through the trees as clouds drift by",
+    "The statue slowly turns to look at the camera",
+    "Waves roll onto the beach in slow motion",
+    "The cat blinks and yawns, then settles back to sleep",
+    "Snow begins to fall softly over the scene",
 ]
 
 
 @app.route("/")
 def index():
-    return render_template("index.html", motions=MOTIONS)
+    return render_template("index.html", ideas=PROMPT_IDEAS)
 
 
 @app.route("/api/status")
 def status():
-    """Whether the GPU worker is reachable and advertises the animate task."""
+    """Whether the GPU worker is reachable."""
     try:
         r = http.get(f"{NECRON}/status", timeout=(CONNECT_TIMEOUT, 6))
         return jsonify({"available": r.ok})
@@ -42,9 +44,11 @@ def status():
 def animate():
     if "image" not in request.files:
         return jsonify({"error": "No image provided"}), 400
-    motion = request.form.get("motion", "pan")
-    if motion not in {m["id"] for m in MOTIONS}:
-        return jsonify({"error": "Unknown motion preset"}), 400
+    prompt = (request.form.get("prompt") or "").strip()
+    if not prompt:
+        return jsonify({"error": "Describe the motion you want first."}), 400
+    if len(prompt) > 400:
+        return jsonify({"error": "Prompt too long (max 400 characters)."}), 400
 
     file = request.files["image"]
     raw  = file.read()
@@ -52,14 +56,14 @@ def animate():
         resp = http.post(
             f"{NECRON}/animate",
             files={"image": (file.filename, raw, file.content_type)},
-            data={"motion": motion},
+            data={"prompt": prompt},
             timeout=(CONNECT_TIMEOUT, READ_TIMEOUT),
         )
         return (resp.content, resp.status_code,
                 {"Content-Type": resp.headers.get("Content-Type", "application/json")})
     except http.exceptions.RequestException:
         return jsonify({
-            "error": "The GPU worker is offline. Animation requires the club's RTX 5080 machine.",
+            "error": "The club's GPU servers are offline right now. Try again later.",
             "gpu_offline": True,
         }), 503
 

@@ -6,7 +6,7 @@ First-order motion synthesis with the safety rails built in from day one. An edu
 
 ## What it does
 
-Upload a still image, pick a motion preset (talking, nodding, smiling, cinematic pan), and a first-order motion model on the club's RTX 5080 warps the image to follow that motion, frame by frame.
+Upload a still image, pick a motion preset (talking, nodding, smiling, cinematic pan), and a first-order motion model on the club's GPUs warps the image to follow that motion, frame by frame.
 
 ## Why a school club built a deepfake tool
 
